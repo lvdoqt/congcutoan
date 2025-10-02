@@ -1,0 +1,5 @@
+{
+  "name": "Công cụ Toán học",
+  "description": "Một ứng dụng web trực quan giúp học sinh trung học phổ thông Việt Nam thực hành các khái niệm toán học từ lớp 10 đến lớp 12, bao gồm hệ thức lượng, lượng giác, và khảo sát hàm số.",
+  "requestFramePermissions": []
+}
