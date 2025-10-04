@@ -3,36 +3,34 @@ import { Link } from 'react-router-dom';
 
 // FIX: Replaced `JSX.Element` with `React.ReactElement` to fix 'Cannot find namespace JSX' error.
 const FeatureCard = ({ icon, title, description, link }: { icon: React.ReactElement, title: string, description: string, link: string }) => (
-  <Link to={link} className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow transform hover:-translate-y-1">
-    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 text-blue-600 mb-4">
+  <Link to={link} className="group bg-white p-6 rounded-2xl shadow-soft hover-lift">
+    <div className="flex items-center justify-center h-14 w-14 rounded-2xl bg-sky-100 text-sky-600 mb-4 group-hover:bg-gradient-primary group-hover:text-white transition-all duration-300">
       {icon}
     </div>
-    <h3 className="text-xl font-bold text-gray-800 mb-2">{title}</h3>
-    <p className="text-gray-600">{description}</p>
+    <h3 className="text-xl font-bold text-gray-800 mb-3 group-hover:text-sky-600 transition-colors">{title}</h3>
+    <p className="text-gray-600 leading-relaxed">{description}</p>
   </Link>
 );
 
 const HomePage: React.FC = () => {
   return (
     <div className="space-y-12">
-      {/* Hero Section */}
-      <section className="text-center bg-white p-10 rounded-lg shadow-lg" style={{ backgroundImage: 'linear-gradient(to right, #6366f1, #3b82f6)', color: 'white' }}>
-        <h1 className="text-5xl font-extrabold mb-4">Khám Phá Toán Học</h1>
-        <p className="text-xl mb-8 max-w-2xl mx-auto">
+      <section className="text-center bg-gradient-primary p-12 md:p-16 rounded-3xl shadow-hover animate-fadeIn text-white">
+        <h1 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight">Khám Phá Toán Học</h1>
+        <p className="text-lg md:text-xl mb-10 max-w-3xl mx-auto leading-relaxed opacity-95">
           Bộ công cụ trực quan, mạnh mẽ giúp bạn chinh phục các bài toán phổ thông một cách dễ dàng và hiệu quả.
         </p>
-        <Link 
-          to="/tool/scientific-calculator" 
-          className="bg-white text-blue-600 font-bold py-3 px-8 rounded-full hover:bg-gray-100 transition-transform transform hover:scale-105"
+        <Link
+          to="/tool/scientific-calculator"
+          className="inline-block bg-white text-sky-600 font-bold py-4 px-10 rounded-full hover:bg-gray-100 hover:scale-105 transition-all shadow-lg hover:shadow-xl"
         >
           Bắt đầu ngay
         </Link>
       </section>
 
-      {/* Features Section */}
-      <section>
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">Các công cụ nổi bật</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <section className="animate-fadeIn">
+        <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-10">Các công cụ nổi bật</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           <FeatureCard 
             icon={<IconCalculator />}
             title="Máy tính khoa học"

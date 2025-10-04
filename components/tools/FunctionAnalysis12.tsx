@@ -12,7 +12,10 @@ interface AnalysisResult {
   derivative2: string;
   criticalPoints: { x: number; y: number; type: string }[];
   inflectionPoints: { x: number; y: number }[];
-  variationTable: any; // Simplified for now
+  limitAtInfinity: { posInf: string; negInf: string };
+  asymptotes: { vertical: number[]; horizontal: number | null; oblique: string | null };
+  monotonicity: { interval: string; trend: string }[];
+  concavity: { interval: string; type: string }[];
 }
 
 const FunctionAnalysis12: React.FC = () => {
@@ -20,6 +23,7 @@ const FunctionAnalysis12: React.FC = () => {
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [chartData, setChartData] = useState<any>(null);
+    const [variationData, setVariationData] = useState<any>(null);
     
     const nodeRef = useRef(null);
 
@@ -86,35 +90,181 @@ const FunctionAnalysis12: React.FC = () => {
                 y: node.evaluate({ x: p.x }),
              }));
 
+            const limitAtInfinity = calculateLimits(node);
+            const asymptotes = findAsymptotes(node, funcStr);
+            const monotonicity = analyzeMonotonicity(derivative1Node, criticalPoints);
+            const concavity = analyzeConcavity(derivative2Node, inflectionPoints);
+
             setResult({
-                domain: 'D = R',
+                domain: 'D = ℝ',
                 derivative1: derivative1Str,
                 derivative2: derivative2Str,
                 criticalPoints,
                 inflectionPoints,
-                variationTable: null,
+                limitAtInfinity,
+                asymptotes,
+                monotonicity,
+                concavity,
             });
 
-            // --- Generate Chart Data ---
-            generateChartData(node, criticalPoints);
+            buildVariationTable(criticalPoints, monotonicity);
+
+            generateChartData(node, criticalPoints, inflectionPoints);
 
         } catch (e: any) {
             setError(`Lỗi phân tích hàm số: ${e.message}. Vui lòng kiểm tra lại cú pháp (ví dụ: x^3 - 3*x).`);
         }
     };
 
-    const generateChartData = (node: math.MathNode, criticalPoints: any[]) => {
+    const calculateLimits = (node: math.MathNode) => {
+        try {
+            const posInfVal = node.evaluate({ x: 10000 });
+            const negInfVal = node.evaluate({ x: -10000 });
+            return {
+                posInf: isFinite(posInfVal) ? (Math.abs(posInfVal) > 1000 ? (posInfVal > 0 ? '+∞' : '-∞') : posInfVal.toFixed(2)) : '+∞',
+                negInf: isFinite(negInfVal) ? (Math.abs(negInfVal) > 1000 ? (negInfVal > 0 ? '+∞' : '-∞') : negInfVal.toFixed(2)) : '-∞',
+            };
+        } catch {
+            return { posInf: 'Không xác định', negInf: 'Không xác định' };
+        }
+    };
+
+    const findAsymptotes = (node: math.MathNode, funcStr: string) => {
+        const asymptotes: { vertical: number[]; horizontal: number | null; oblique: string | null } = {
+            vertical: [],
+            horizontal: null,
+            oblique: null,
+        };
+
+        if (funcStr.includes('/')) {
+            const testPoints = [-100, -10, -1, 0, 1, 10, 100];
+            for (const x of testPoints) {
+                try {
+                    const y = node.evaluate({ x });
+                    if (!isFinite(y)) asymptotes.vertical.push(x);
+                } catch {}
+            }
+        }
+
+        try {
+            const yAtLargeX = node.evaluate({ x: 10000 });
+            if (isFinite(yAtLargeX) && Math.abs(yAtLargeX) < 1000) {
+                asymptotes.horizontal = Number(yAtLargeX.toFixed(2));
+            }
+        } catch {}
+
+        return asymptotes;
+    };
+
+    const analyzeMonotonicity = (derivative1Node: math.MathNode, criticalPoints: any[]) => {
+        const monotonicity: { interval: string; trend: string }[] = [];
+        const criticalXs = criticalPoints.map(p => p.x).sort((a, b) => a - b);
+
+        if (criticalXs.length === 0) {
+            const testY = derivative1Node.evaluate({ x: 0 });
+            monotonicity.push({
+                interval: '(-∞, +∞)',
+                trend: testY > 0 ? 'Tăng' : 'Giảm',
+            });
+        } else {
+            const testX1 = criticalXs[0] - 1;
+            const testY1 = derivative1Node.evaluate({ x: testX1 });
+            monotonicity.push({
+                interval: `(-∞, ${criticalXs[0].toFixed(2)})`,
+                trend: testY1 > 0 ? 'Tăng' : 'Giảm',
+            });
+
+            for (let i = 0; i < criticalXs.length - 1; i++) {
+                const testX = (criticalXs[i] + criticalXs[i + 1]) / 2;
+                const testY = derivative1Node.evaluate({ x: testX });
+                monotonicity.push({
+                    interval: `(${criticalXs[i].toFixed(2)}, ${criticalXs[i + 1].toFixed(2)})`,
+                    trend: testY > 0 ? 'Tăng' : 'Giảm',
+                });
+            }
+
+            const testXn = criticalXs[criticalXs.length - 1] + 1;
+            const testYn = derivative1Node.evaluate({ x: testXn });
+            monotonicity.push({
+                interval: `(${criticalXs[criticalXs.length - 1].toFixed(2)}, +∞)`,
+                trend: testYn > 0 ? 'Tăng' : 'Giảm',
+            });
+        }
+
+        return monotonicity;
+    };
+
+    const analyzeConcavity = (derivative2Node: math.MathNode, inflectionPoints: any[]) => {
+        const concavity: { interval: string; type: string }[] = [];
+        const inflectionXs = inflectionPoints.map(p => p.x).sort((a, b) => a - b);
+
+        if (inflectionXs.length === 0) {
+            const testY = derivative2Node.evaluate({ x: 0 });
+            concavity.push({
+                interval: '(-∞, +∞)',
+                type: testY > 0 ? 'Lồi' : 'Lõm',
+            });
+        } else {
+            const testX1 = inflectionXs[0] - 1;
+            const testY1 = derivative2Node.evaluate({ x: testX1 });
+            concavity.push({
+                interval: `(-∞, ${inflectionXs[0].toFixed(2)})`,
+                type: testY1 > 0 ? 'Lồi' : 'Lõm',
+            });
+
+            for (let i = 0; i < inflectionXs.length - 1; i++) {
+                const testX = (inflectionXs[i] + inflectionXs[i + 1]) / 2;
+                const testY = derivative2Node.evaluate({ x: testX });
+                concavity.push({
+                    interval: `(${inflectionXs[i].toFixed(2)}, ${inflectionXs[i + 1].toFixed(2)})`,
+                    type: testY > 0 ? 'Lồi' : 'Lõm',
+                });
+            }
+
+            const testXn = inflectionXs[inflectionXs.length - 1] + 1;
+            const testYn = derivative2Node.evaluate({ x: testXn });
+            concavity.push({
+                interval: `(${inflectionXs[inflectionXs.length - 1].toFixed(2)}, +∞)`,
+                type: testYn > 0 ? 'Lồi' : 'Lõm',
+            });
+        }
+
+        return concavity;
+    };
+
+    const buildVariationTable = (criticalPoints: any[], monotonicity: any[]) => {
+        const tableData: any[] = [];
+
+        monotonicity.forEach((item, idx) => {
+            const critPoint = criticalPoints.find(cp => item.interval.includes(cp.x.toFixed(2)));
+            tableData.push({
+                interval: item.interval,
+                derivative: item.trend === 'Tăng' ? '+' : '-',
+                function: item.trend,
+                criticalPoint: critPoint ? `(${critPoint.x.toFixed(2)}, ${critPoint.y.toFixed(2)})` : null,
+            });
+        });
+
+        setVariationData(tableData);
+    };
+
+    const generateChartData = (node: math.MathNode, criticalPoints: any[], inflectionPoints: any[]) => {
         const xValues = [];
         const yValues = [];
-        
-        const xCoords = criticalPoints.map(p => p.x);
-        const minX = xCoords.length > 0 ? Math.min(...xCoords) - 2 : -5;
-        const maxX = xCoords.length > 0 ? Math.max(...xCoords) + 2 : 5;
-        const step = (maxX - minX) / 100;
+
+        const allXs = [...criticalPoints.map(p => p.x), ...inflectionPoints.map(p => p.x)];
+        const minX = allXs.length > 0 ? Math.min(...allXs) - 3 : -5;
+        const maxX = allXs.length > 0 ? Math.max(...allXs) + 3 : 5;
+        const step = (maxX - minX) / 200;
 
         for (let x = minX; x <= maxX; x += step) {
-            xValues.push(x.toFixed(2));
-            yValues.push(node.evaluate({ x }));
+            try {
+                const y = node.evaluate({ x });
+                if (isFinite(y) && Math.abs(y) < 10000) {
+                    xValues.push(x.toFixed(2));
+                    yValues.push(y);
+                }
+            } catch {}
         }
 
         setChartData({
@@ -122,77 +272,202 @@ const FunctionAnalysis12: React.FC = () => {
             datasets: [{
                 label: `y = ${funcStr}`,
                 data: yValues,
-                borderColor: 'rgb(59, 130, 246)',
-                backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                tension: 0.1,
+                borderColor: 'rgb(14, 165, 233)',
+                backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                tension: 0.4,
+                pointRadius: 0,
+                borderWidth: 3,
             }]
         });
     };
 
     return (
         <div className="space-y-8">
-            <section className="bg-white p-6 rounded-lg shadow-inner border">
-                <h3 className="text-xl font-semibold text-blue-700 mb-4">Nhập hàm số</h3>
-                <div className="flex flex-wrap items-center gap-4">
-                    <span className="font-mono text-lg">y =</span>
-                    <input 
-                        type="text" 
-                        value={funcStr} 
-                        onChange={e => setFuncStr(e.target.value)} 
-                        placeholder="VD: x^3 - 3*x + 2" 
-                        className="p-2 border rounded-md w-full md:w-80 font-mono"
+            <section className="bg-gradient-to-br from-sky-50 to-white p-6 md:p-8 rounded-2xl shadow-soft border border-sky-100">
+                <h3 className="text-2xl font-bold text-sky-700 mb-6">Nhập hàm số</h3>
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                    <span className="font-mono text-xl font-semibold text-gray-700">y =</span>
+                    <input
+                        type="text"
+                        value={funcStr}
+                        onChange={e => setFuncStr(e.target.value)}
+                        placeholder="VD: x^3 - 3*x^2 + 2"
+                        className="flex-1 p-3 border-2 border-sky-200 rounded-xl w-full md:w-auto font-mono text-lg focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 transition-all"
                     />
-                    <button onClick={analyzeFunction} className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+                    <button
+                        onClick={analyzeFunction}
+                        className="bg-gradient-primary text-white font-bold py-3 px-8 rounded-xl hover:shadow-lg hover:scale-105 transition-all w-full md:w-auto"
+                    >
                         Khảo sát
                     </button>
                 </div>
-                 <p className="text-sm text-gray-500 mt-2">Hiện tại hỗ trợ các hàm đa thức bậc 2, 3. Sử dụng `*` cho phép nhân, ví dụ: `3*x^2`.</p>
+                <p className="text-sm text-gray-600 mt-4 bg-white p-3 rounded-lg border-l-4 border-sky-500">
+                    Hỗ trợ hàm đa thức (bậc 2, 3, 4) và hàm hữu tỷ. Sử dụng <code className="bg-gray-100 px-2 py-1 rounded">*</code> cho phép nhân, ví dụ: <code className="bg-gray-100 px-2 py-1 rounded">3*x^2</code>
+                </p>
             </section>
             
-            {error && <div className="p-4 bg-red-100 text-red-700 border border-red-200 rounded-lg">{error}</div>}
+            {error && (
+                <div className="p-5 bg-red-50 text-red-700 border-l-4 border-red-500 rounded-xl shadow-soft animate-fadeIn">
+                    <div className="flex items-start gap-3">
+                        <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <p className="font-medium">{error}</p>
+                    </div>
+                </div>
+            )}
 
             {result && (
-                <div className="space-y-6">
-                    <section className="bg-white p-6 rounded-lg shadow-inner border">
-                        <h3 className="text-xl font-semibold text-blue-700 mb-4">Kết quả Khảo sát</h3>
-                        <div className="space-y-3 text-gray-800">
-                             <p><strong>Tập xác định:</strong> {result.domain}</p>
-                            <p><strong>Đạo hàm bậc nhất (y'):</strong> <KatexRenderer latex={math.parse(result.derivative1).toTex()} /></p>
-                            <p><strong>Đạo hàm bậc hai (y''):</strong> <KatexRenderer latex={math.parse(result.derivative2).toTex()} /></p>
-                            
-                            <div>
-                                <strong>Điểm cực trị:</strong>
-                                {result.criticalPoints.length > 0 ? (
-                                    <ul className="list-disc list-inside ml-4">
-                                        {result.criticalPoints.map((p, i) => (
-                                            <li key={i}>
-                                                {p.type} tại <KatexRenderer latex={`(${p.x.toFixed(2)}; ${p.y.toFixed(2)})`} />
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : ( <p className="ml-4">Không có điểm cực trị.</p> )
-                                }
+                <div className="space-y-6 animate-fadeIn">
+                    <section className="bg-white p-6 md:p-8 rounded-2xl shadow-soft border border-gray-200">
+                        <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <span className="text-3xl">📊</span> Kết quả Khảo sát
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                                <div className="bg-sky-50 p-4 rounded-xl border-l-4 border-sky-500">
+                                    <p className="font-semibold text-gray-700 mb-1">Tập xác định:</p>
+                                    <p className="text-lg font-mono">{result.domain}</p>
+                                </div>
+
+                                <div className="bg-emerald-50 p-4 rounded-xl border-l-4 border-emerald-500">
+                                    <p className="font-semibold text-gray-700 mb-2">Đạo hàm bậc nhất:</p>
+                                    <div className="text-lg"><KatexRenderer latex={`y' = ${math.parse(result.derivative1).toTex()}`} /></div>
+                                </div>
+
+                                <div className="bg-amber-50 p-4 rounded-xl border-l-4 border-amber-500">
+                                    <p className="font-semibold text-gray-700 mb-2">Đạo hàm bậc hai:</p>
+                                    <div className="text-lg"><KatexRenderer latex={`y'' = ${math.parse(result.derivative2).toTex()}`} /></div>
+                                </div>
+
+                                <div className="bg-teal-50 p-4 rounded-xl border-l-4 border-teal-500">
+                                    <p className="font-semibold text-gray-700 mb-2">Giới hạn:</p>
+                                    <div className="space-y-1 text-gray-700">
+                                        <p><KatexRenderer latex={`\\lim_{x \\to +\\infty} f(x) = ${result.limitAtInfinity.posInf}`} /></p>
+                                        <p><KatexRenderer latex={`\\lim_{x \\to -\\infty} f(x) = ${result.limitAtInfinity.negInf}`} /></p>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <strong>Điểm uốn:</strong>
-                                 {result.inflectionPoints.length > 0 ? (
-                                    <ul className="list-disc list-inside ml-4">
-                                        {result.inflectionPoints.map((p, i) => (
-                                            <li key={i}>
-                                               Điểm uốn tại <KatexRenderer latex={`(${p.x.toFixed(2)}; ${p.y.toFixed(2)})`} />
+
+                            <div className="space-y-4">
+                                <div className="bg-purple-50 p-4 rounded-xl border-l-4 border-purple-500">
+                                    <p className="font-semibold text-gray-700 mb-2">Điểm cực trị:</p>
+                                    {result.criticalPoints.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {result.criticalPoints.map((p, i) => (
+                                                <li key={i} className="flex items-start gap-2">
+                                                    <span className="text-purple-600 font-bold">•</span>
+                                                    <span>{p.type} tại <KatexRenderer latex={`(${p.x.toFixed(2)}; ${p.y.toFixed(2)})`} /></span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-gray-600 italic">Không có điểm cực trị</p>
+                                    )}
+                                </div>
+
+                                <div className="bg-rose-50 p-4 rounded-xl border-l-4 border-rose-500">
+                                    <p className="font-semibold text-gray-700 mb-2">Điểm uốn:</p>
+                                    {result.inflectionPoints.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {result.inflectionPoints.map((p, i) => (
+                                                <li key={i} className="flex items-start gap-2">
+                                                    <span className="text-rose-600 font-bold">•</span>
+                                                    <span>Điểm uốn tại <KatexRenderer latex={`(${p.x.toFixed(2)}; ${p.y.toFixed(2)})`} /></span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-gray-600 italic">Không có điểm uốn</p>
+                                    )}
+                                </div>
+
+                                <div className="bg-indigo-50 p-4 rounded-xl border-l-4 border-indigo-500">
+                                    <p className="font-semibold text-gray-700 mb-2">Tính đơn điệu:</p>
+                                    <ul className="space-y-1 text-sm">
+                                        {result.monotonicity.map((m, i) => (
+                                            <li key={i} className="flex items-center gap-2">
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${m.trend === 'Tăng' ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
+                                                    {m.trend === 'Tăng' ? '↗' : '↘'}
+                                                </span>
+                                                <span>{m.interval}</span>
                                             </li>
                                         ))}
                                     </ul>
-                                ) : ( <p className="ml-4">Không có điểm uốn.</p> )
-                                }
+                                </div>
+
+                                <div className="bg-cyan-50 p-4 rounded-xl border-l-4 border-cyan-500">
+                                    <p className="font-semibold text-gray-700 mb-2">Tính lồi/lõm:</p>
+                                    <ul className="space-y-1 text-sm">
+                                        {result.concavity.map((c, i) => (
+                                            <li key={i} className="flex items-center gap-2">
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${c.type === 'Lồi' ? 'bg-blue-200 text-blue-800' : 'bg-orange-200 text-orange-800'}`}>
+                                                    {c.type === 'Lồi' ? '⌢' : '⌣'}
+                                                </span>
+                                                <span>{c.interval}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </section>
+
+                    {variationData && variationData.length > 0 && (
+                        <section className="bg-white p-6 md:p-8 rounded-2xl shadow-soft border border-gray-200">
+                            <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                                <span className="text-3xl">📈</span> Bảng biến thiên
+                            </h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-100">
+                                            <th className="border-2 border-gray-300 p-3 font-semibold">Khoảng</th>
+                                            <th className="border-2 border-gray-300 p-3 font-semibold">y'</th>
+                                            <th className="border-2 border-gray-300 p-3 font-semibold">y</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {variationData.map((row: any, i: number) => (
+                                            <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                                <td className="border-2 border-gray-300 p-3 text-center font-mono">{row.interval}</td>
+                                                <td className="border-2 border-gray-300 p-3 text-center font-bold text-lg">{row.derivative}</td>
+                                                <td className="border-2 border-gray-300 p-3 text-center">
+                                                    <span className={`font-semibold ${row.function === 'Tăng' ? 'text-green-600' : 'text-red-600'}`}>
+                                                        {row.function}
+                                                    </span>
+                                                    {row.criticalPoint && <div className="text-xs text-gray-600 mt-1">{row.criticalPoint}</div>}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    )}
                     
                     {chartData && (
-                        <section className="bg-white p-6 rounded-lg shadow-inner border">
-                            <h3 className="text-xl font-semibold text-blue-700 mb-4">Đồ thị Hàm số</h3>
-                            <Line data={chartData} options={{ responsive: true, plugins: { legend: { display: true } } }} />
+                        <section className="bg-white p-6 md:p-8 rounded-2xl shadow-soft border border-gray-200">
+                            <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                                <span className="text-3xl">📉</span> Đồ thị Hàm số
+                            </h3>
+                            <div className="bg-gray-50 p-4 rounded-xl">
+                                <Line
+                                    data={chartData}
+                                    options={{
+                                        responsive: true,
+                                        maintainAspectRatio: true,
+                                        plugins: {
+                                            legend: { display: true, position: 'top' },
+                                            tooltip: { enabled: true },
+                                        },
+                                        scales: {
+                                            x: { grid: { color: 'rgba(0, 0, 0, 0.05)' } },
+                                            y: { grid: { color: 'rgba(0, 0, 0, 0.05)' } },
+                                        },
+                                    }}
+                                />
+                            </div>
                         </section>
                     )}
                 </div>

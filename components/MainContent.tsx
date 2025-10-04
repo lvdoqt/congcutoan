@@ -20,8 +20,10 @@ const MainContent: React.FC = () => {
   const ToolComponent = activeTool.component;
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-lg">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6 pb-2 border-b-2 border-blue-500">{activeTool.name}</h1>
+    <div className="bg-white p-6 md:p-8 rounded-2xl shadow-soft hover:shadow-hover transition-all animate-fadeIn">
+      <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8 pb-4 border-b-4 border-gradient-primary">
+        {activeTool.name}
+      </h1>
       <ToolComponent />
     </div>
   );

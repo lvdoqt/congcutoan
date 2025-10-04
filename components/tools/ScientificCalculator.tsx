@@ -95,11 +95,11 @@ const ScientificCalculator: React.FC = () => {
             key={btn}
             onClick={() => handleButtonClick(btn)}
             className={`
-                p-3 sm:p-4 text-lg font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400
-                ${['/', '*', '-', '+'].includes(btn) ? 'bg-blue-500 hover:bg-blue-600 text-white' : ''}
-                ${['C', '←'].includes(btn) ? 'bg-red-500 hover:bg-red-600 text-white' : ''}
-                ${btn === '=' ? 'bg-green-500 hover:bg-green-600 text-white col-span-4' : ''}
-                ${!['/', '*', '-', '+', 'C', '←', '='].includes(btn) ? 'bg-gray-200 hover:bg-gray-300 text-gray-800' : ''}
+                p-3 sm:p-4 text-lg font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 active:scale-95
+                ${['/', '*', '-', '+'].includes(btn) ? 'bg-sky-500 hover:bg-sky-600 text-white shadow-md hover:shadow-lg focus:ring-sky-400' : ''}
+                ${['C', '←'].includes(btn) ? 'bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg focus:ring-red-400' : ''}
+                ${btn === '=' ? 'bg-gradient-primary hover:bg-gradient-secondary text-white col-span-4 shadow-lg hover:shadow-xl focus:ring-sky-400' : ''}
+                ${!['/', '*', '-', '+', 'C', '←', '='].includes(btn) ? 'bg-white hover:bg-gray-50 text-gray-800 border border-gray-300 shadow-sm hover:shadow-md focus:ring-sky-300' : ''}
             `}
         >
             {btn}
@@ -107,12 +107,12 @@ const ScientificCalculator: React.FC = () => {
     );
 
     return (
-        <div className="max-w-xs mx-auto bg-white p-4 sm:p-5 rounded-lg shadow-lg border">
-            <div className="bg-gray-100 p-4 rounded-lg mb-4 text-right overflow-x-auto min-h-[90px] flex flex-col justify-between">
-                <div className="text-red-500 text-sm h-5">{error || ''}</div>
-                <div className="text-3xl sm:text-4xl font-mono text-gray-800 break-all">{displayValue || '0'}</div>
+        <div className="max-w-md mx-auto bg-gradient-to-br from-gray-50 to-white p-6 rounded-2xl shadow-soft border border-gray-200">
+            <div className="bg-gray-900 p-5 rounded-xl mb-6 text-right overflow-x-auto min-h-[100px] flex flex-col justify-between shadow-inner">
+                <div className="text-red-400 text-sm h-5 font-medium">{error || ''}</div>
+                <div className="text-3xl sm:text-4xl font-mono text-white break-all">{displayValue || '0'}</div>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-3">
                 {buttons.map(btn => renderButton(btn))}
             </div>
         </div>
